@@ -1,6 +1,12 @@
 use super::fonts;
 use misc;
-use stm32f429::{SPI5, RCC, GPIOA, GPIOB, GPIOC, GPIOD, GPIOF, GPIOG};
+use stm32f429::{
+    SPI5,
+    RCC,
+    GPIOA, GPIOB, GPIOC, GPIOD, GPIOF, GPIOG,
+    LTDC,
+};
+use sdram;
 
 pub enum LcdError {
     OutOfFrame,
@@ -116,7 +122,7 @@ impl Lcd {
         let pd = unsafe {&*GPIOD.get()};
         let pf = unsafe {&*GPIOF.get()};
         let pg = unsafe {&*GPIOG.get()};
-        
+
         self.display_off();
 
         spi.cr1.modify(|_, W| w.spe().bit(false));
@@ -269,9 +275,45 @@ impl Lcd {
     }
 
     pub fn init(&mut self) {
+        let rcc = unsafe {&*RCC.get()};
+        let ltdc = unsafe {&*LTDC.get()};
+
         configure_ctrl_lines();
 
-        self.chip_select()
+        self.chip_select(true);
+        self.chip_select(false);
+
+        configure_spi();
+
+        self.power_on();
+
+        rcc.apb2enr.modify(|_, w| w.ltdcen().bit(true));
+        rcc.ahb1enr.modify(|_, w| w.dma2den().bit(true));
+
+        configure_alt_fn_gpios();
+
+        sdram::init();
+
+        rcc.pllsaicfgr.modify(|_, w| unsafe {
+            w.pllsain().bits(192)
+             .pllsaiq().bits(7)
+             .pllsair().bits(4)
+        });
+
+        rcc.dckcfgr.modify(|_, w| unsafe {
+            w.pllsaidivr().bits(2)  // divide by 8
+        });
+
+        rcc.cr.modify(|_, w| w.pllsaion().bit(true));
+        while rcc.cr.read().pllsairdy().bit() == false {}
+
+        ltdc.gcr.modify(|_, w| unsafe {
+            w.hspol().bit(false)    // active low
+             .vspol().bit(false)    // active low
+             .depol().bit(false)    // active low
+             .pcpol().bit(false)    // same as input pixel clock
+             .
+        });
     }
 
     pub fn init_layers(&mut self) {
@@ -318,7 +360,7 @@ impl Lcd {
     pub fn set_cursor(&mut self, x : u16, y : u16) -> Result<(), LcdError> {
 
         Ok(())
-    } 
+    }
 
     pub fn set_color_keying(&self, rgv_val : u32) {
 
