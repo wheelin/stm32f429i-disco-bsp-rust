@@ -55,6 +55,7 @@ pub enum Register {
     LcdPRC           = 0xF7, /* Pump ratio control register */
 }
 
+#[derive(Copy, Clone)]
 pub enum Color {
     White   = 0xFFFF,
     Black   = 0x0000,
@@ -312,29 +313,180 @@ impl Lcd {
              .vspol().bit(false)    // active low
              .depol().bit(false)    // active low
              .pcpol().bit(false)    // same as input pixel clock
-             .
+        });
+
+        ltdc.bccr.modify(|_, w| unsafe {
+            w.bcred().bits(0)
+             .bcgreen().bits(0)
+             .bcblue().bits(0)
+        });
+
+        ltdc.twcr.modify(|_, w| unsafe{
+            w.totalw().bits(279)    // hsync width + hbp + active width + hfp - 1
+             .totalh().bits(327)    // vsync height + vbp + active height + vfp - 1
+        });
+
+        ltdc.awcr.modify(|_, w| unsafe{
+            w.aaw().bits(269)       // hsync width + hbp + active width - 1
+             .aah().bits(323)       // vsync height + vhp + active heigh - 1
+        });
+
+        ltdc.bpcr.modify(|_, w| unsafe {
+            w.ahbp().bits(29)       // hsync width + hbp - 1
+             .avpb().bits(3)        // vsync height + vbp - 1
+        });
+
+        ltdc.sscr.modify(|_, w| unsafe {
+            w.hsw().bits(9)
+             .vsh().bits(1)
         });
     }
 
     pub fn init_layers(&mut self) {
+        let ltdc = unsafe {&*LTDC.get()};
+        ////////////////////////////////////////////////////////////////
+        // first layer configuration
+        ltdc.l1whpcr.modify(|_, w| unsafe {
+            w.whsppos().bits(LCD_WIDTH + 30 - 1)
+             .whstpos().bits(30)
+        });
 
+        ltdc.l1wvpcr.modify(|_, w| unsafe {
+            w.wvsppos().bits(LCD_HEIGHT + 4 - 1)
+             .wvstpos().bits(4)
+        });
+
+        // configure pixel format
+        ltdc.l1pfcr.modify(|_, w| unsafe {
+            w.pf().bits(0b010)      // Pixel format : RGB565
+        });
+
+        // constant alpha
+        ltdc.l1cacr.modify(|_, w| unsafe {
+            w.consta().bits(255)    // totally opaque
+        });
+
+        // default colors
+        ltdc.l1dccr.modify(|_, w| unsafe {
+            w.dcalpha().bits(0)
+             .dcred().bits(0)
+             .dcgreen().bits(0)
+             .dcblue().bits(0)
+        });
+
+        ltdc.l1bfcr.modify(|_, w| unsafe {
+            w.bf1().bits(0b100)     // constant alpha
+             .bf2().bits(0b100)
+        });
+
+        // configure start address of the color frame buffer
+        ltdc.l1cfbar.write(|w| unsafe {
+            w.bits(LCD_FRAME_BUFFER_START)
+        });
+
+        ltdc.l1cfblr.modify(|_, w| unsafe {
+            w.cfbp().bits(LCD_WIDTH * 2)
+             .cfbll().bits((LCD_WIDTH * 2) + 3)
+        });
+
+        ltdc.l1cfblnr.modify(|_, w| unsafe {
+            w.cfblnbr().bits(LCD_HEIGHT)
+        });
+        ////////////////////////////////////////////////////////////////
+        // second layer configuration
+
+        ltdc.l2whpcr.modify(|_, w| unsafe {
+            w.whsppos().bits(LCD_WIDTH + 30 - 1)
+             .whstpos().bits(30)
+        });
+
+        ltdc.l2wvpcr.modify(|_, w| unsafe {
+            w.wvsppos().bits(LCD_HEIGHT + 4 - 1)
+             .wvstpos().bits(4)
+        });
+
+        // configure pixel format
+        ltdc.l2pfcr.modify(|_, w| unsafe {
+            w.pf().bits(0b010)      // Pixel format : RGB565
+        });
+
+        // constant alpha
+        ltdc.l2cacr.modify(|_, w| unsafe {
+            w.consta().bits(255)    // totally opaque
+        });
+
+        // default colors
+        ltdc.l2dccr.modify(|_, w| unsafe {
+            w.dcalpha().bits(0)
+             .dcred().bits(0)
+             .dcgreen().bits(0)
+             .dcblue().bits(0)
+        });
+
+        // blending factor, change from layer 1
+        ltdc.l2bfcr.modify(|_, w| unsafe {
+            w.bf1().bits(0b110)     // pixel alpha * constant alpha
+             .bf2().bits(0b110)
+        });
+
+        // configure start address of the color frame buffer, change from layer 1
+        ltdc.l2cfbar.write(|w| unsafe {
+            w.bits(LCD_FRAME_BUFFER_START + LCD_BUFFER_OFFSET)
+        });
+
+        ltdc.l2cfblr.modify(|_, w| unsafe {
+            w.cfbp().bits(LCD_WIDTH * 2)
+             .cfbll().bits((LCD_WIDTH * 2) + 3)
+        });
+
+        ltdc.l2cfblnr.modify(|_, w| unsafe {
+            w.cfblnbr().bits(LCD_HEIGHT)
+        });
+
+        // set reload mode
+        ltdc.srcr.modify(|_, w| unsafe {
+            w.imr().bit(true)       // immediate reload mode
+        });
+
+        // enable layer 1 and 2
+        ltdc.l1cr.modify(|_, w| w.len().bit(true));
+        ltdc.l2cr.modify(|_, w| w.len().bit(true));
+
+        // set default font
+        self.current_font = &fonts::FONT_16_X_24;
+
+        // enable dither
+        ltdc.gcr.modify(|_, w| w.den().bit(true));
     }
 
     fn chip_select(&self, en : bool) {
-
+        let pc = unsafe{&*GPIOC.get()};
+        if en {
+            pc.bsrr.write(|w| w.bs2().bit(true));
+        } else {
+            pc.bsrr.write(|w| w.br2().bit(true));
+        }
     }
 
     pub fn set_layer(&mut self, l : Layer) {
-
+        match l {
+            Layer::Background => {
+                self.current_frame_buffer = LCD_FRAME_BUFFER_START;
+            },
+            Layer::Foreground => {
+                self.current_frame_buffer = LCD_FRAME_BUFFER_START + LCD_BUFFER_OFFSET;
+            }
+        };
+        self.current_layer = l;
     }
 
     pub fn set_colors(&mut self, tc : Color, bc : Color) {
-
+        self.current_back_color = bc;
+        self.current_text_color = tc;
     }
 
     pub fn get_colors(&self) -> (Color, Color) {
-
-        (Color::Black, Color::White)
+        (self.current_text_color, self.current_back_color)
     }
 
     pub fn set_text_color(&mut self, tc : Color) {
