@@ -13,33 +13,13 @@ pub fn init() {
     rcc.cr.modify(|_, w| w.hseon().bit(true));
     while rcc.cr.read().hserdy().bit() == false {}
 
-    rcc.pllcfgr.modify(|_, w|
-        w.pllq3().bit(false)
-         .pllq2().bit(true)
-         .pllq1().bit(true)
-         .pllq0().bit(true)
-
-         .pllm5().bit(false)
-         .pllm4().bit(false)
-         .pllm3().bit(true)
-         .pllm2().bit(true)
-         .pllm1().bit(true)
-         .pllm0().bit(true)
-
-         .plln8().bit(true)
-         .plln7().bit(false)
-         .plln6().bit(true)
-         .plln5().bit(true)
-         .plln4().bit(false)
-         .plln3().bit(true)
-         .plln2().bit(false)
-         .plln1().bit(false)
-         .plln0().bit(false)
-
-         .pllp1().bit(true)
-         .pllp0().bit(true)
+    rcc.pllcfgr.modify(|_, w| unsafe {
+        w.pllq().bits(0b0111)
+         .pllm().bits(0b001111)
+         .plln().bits(0b101101000)
+         .pllp().bits(0b11)
          .pllsrc().bit(true)
-    );
+    });
 
     rcc.apb1enr.modify(|_, w| w.pwren().bit(true));
 
@@ -64,8 +44,8 @@ pub fn init() {
          .latency().bits(5)
     });
 
-    rcc.cfgr.modify(|_, w| w.sw0().bit(false));
-    rcc.cfgr.modify(|_, w| w.sw1().bit(true));
-    while rcc.cfgr.read().sws1().bit() != true &&
-          rcc.cfgr.read().sws0().bit() != false {}
+    rcc.cfgr.modify(|_, w| unsafe {
+        w.sw().bits(0b10)
+    });
+    while rcc.cfgr.read().sws().bits() != 0b10 {}
 }

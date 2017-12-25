@@ -37,3 +37,4 @@ version = "0.2.3"
 
 [dependencies]
 stm32f429 = { git = "https://github.com/wheelin/stm32f429_rust_mmap" , features = ["rt"]}
+bitflags = "1.0"

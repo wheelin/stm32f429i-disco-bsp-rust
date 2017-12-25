@@ -10,6 +10,7 @@ use sdram;
 
 pub enum LcdError {
     OutOfFrame,
+    OutOfScreen,
 }
 
 pub struct Point {
@@ -83,21 +84,15 @@ pub fn assemble_rgb(r : u16, g : u16, b : u16) -> u16 {
     (((r & 0xF8) << 8) | ((g << & 0xFC) << 3) | ((b & 0xF8) >> 3))
 }
 
-enum CtrlLinePort {
-    PortB,
-    PortD,
-}
-
 enum CtrlLine {
     Ncs,
     Nwr,
-    Rs,
 }
 
 pub struct Lcd {
     current_font         : &'static fonts::Font,
-    current_text_color   : u16,
-    current_back_color   : u16,
+    current_text_color   : Color,
+    current_back_color   : Color,
     current_frame_buffer : u32,
     current_layer        : Layer,
 }
@@ -126,11 +121,11 @@ impl Lcd {
 
         self.display_off();
 
-        spi.cr1.modify(|_, W| w.spe().bit(false));
+        spi.cr1.modify(|_, w| w.spe().bit(false));
         spi.cr1.reset();
         spi.cr2.reset();
 
-        rcc.apb2enr.modify(|_, w| w.spi5en().bit(false));
+        rcc.apb2enr.modify(|_, w| w.spi5enr().bit(false));
 
         // GPIOA ###################################################
         pa.moder.modify(|_, w| unsafe {
@@ -279,19 +274,19 @@ impl Lcd {
         let rcc = unsafe {&*RCC.get()};
         let ltdc = unsafe {&*LTDC.get()};
 
-        configure_ctrl_lines();
+        Lcd::configure_ctrl_lines();
 
         self.chip_select(true);
         self.chip_select(false);
 
-        configure_spi();
+        Lcd::configure_spi();
 
         self.power_on();
 
         rcc.apb2enr.modify(|_, w| w.ltdcen().bit(true));
         rcc.ahb1enr.modify(|_, w| w.dma2den().bit(true));
 
-        configure_alt_fn_gpios();
+        Lcd::configure_alt_fn_gpios();
 
         sdram::init();
 
@@ -316,9 +311,7 @@ impl Lcd {
         });
 
         ltdc.bccr.modify(|_, w| unsafe {
-            w.bcred().bits(0)
-             .bcgreen().bits(0)
-             .bcblue().bits(0)
+            w.bits(0)
         });
 
         ltdc.twcr.modify(|_, w| unsafe{
@@ -327,13 +320,13 @@ impl Lcd {
         });
 
         ltdc.awcr.modify(|_, w| unsafe{
-            w.aaw().bits(269)       // hsync width + hbp + active width - 1
-             .aah().bits(323)       // vsync height + vhp + active heigh - 1
+            w.aav().bits(323)       // vsync height + vhp + active heigh - 1
+             .aah().bits(269)       // hsync width + hbp + active width - 1
         });
 
         ltdc.bpcr.modify(|_, w| unsafe {
             w.ahbp().bits(29)       // hsync width + hbp - 1
-             .avpb().bits(3)        // vsync height + vbp - 1
+             .avbp().bits(3)        // vsync height + vbp - 1
         });
 
         ltdc.sscr.modify(|_, w| unsafe {
@@ -490,44 +483,135 @@ impl Lcd {
     }
 
     pub fn set_text_color(&mut self, tc : Color) {
-
+        self.current_text_color = tc;
     }
 
     pub fn set_back_color(&mut self, bc : Color) {
-
+        self.current_back_color = bc;
     }
 
     pub fn set_transparency(&self, tr : u8) {
-
+        let ltdc = unsafe {&*LTDC.get()};
+        match self.current_layer {
+            Layer::Background => {
+                ltdc.l1cacr.modify(|_, w| unsafe{
+                    w.consta().bits(tr)
+                });
+            },
+            Layer::Foreground => {
+                ltdc.l2cacr.modify(|_, w| unsafe{
+                    w.consta().bits(tr)
+                });
+            },
+        };
+        ltdc.srcr.modify(|_, w| w.imr().bit(true));
     }
 
-    pub fn clean_line(&self, line : u16) {
+    pub fn get_font(&self) -> &'static fonts::Font {
+        self.current_font
+    }
 
+    pub fn clear_line(&self, line : u16) {
+        let mut ref_col = 0;
+        while (ref_col < LCD_WIDTH) &&
+                (((ref_col + self.current_font.width) & 0xFFFF) >= self.current_font.width) {
+            self.display_char(line, ref_col, ' ');
+            ref_col += self.current_font.width;
+        }
     }
 
     pub fn clear(&mut self, color : Color) {
-
+        for i in 0..LCD_BUFFER_OFFSET {
+            unsafe {
+                let mem_loc = (self.current_frame_buffer + (2 * i)) as *mut u16;
+                *mem_loc = color as u16;
+            }
+        }
     }
 
-    pub fn set_cursor(&mut self, x : u16, y : u16) -> Result<(), LcdError> {
-
-        Ok(())
+    pub fn set_cursor(&mut self, x : u16, y : u16) -> u32 {
+        self.current_frame_buffer + 2*(x as u32 + (LCD_WIDTH as u32 * y as u32))
     }
 
-    pub fn set_color_keying(&self, rgv_val : u32) {
-
+    pub fn set_color_keying(&self, rgb_val : u32) {
+        let ltdc = unsafe{&*LTDC.get()};
+        match self.current_layer {
+            Layer::Background => {
+                ltdc.l1ckcr.modify(|_, w| unsafe {
+                    w.ckred().bits(((rgb_val >> 16) & 0xFF) as u8)
+                     .ckgreen().bits(((rgb_val >> 8) & 0xFF) as u8)
+                     .ckblue().bits((rgb_val & 0xFF) as u8)
+                });
+                ltdc.l1cr.modify(|_, w| w.colken().bit(true));
+            },
+            Layer::Foreground => {
+                ltdc.l2ckcr.modify(|_, w| unsafe {
+                    w.ckred().bits(((rgb_val >> 16) & 0xFF) as u16)
+                     .ckgreen().bits(((rgb_val >> 8) & 0xFF) as u8)
+                     .ckblue().bits((rgb_val & 0xFF) as u8)
+                });
+                ltdc.l2cr.modify(|_, w| w.colken().bit(true));
+            },
+        };
+        ltdc.srcr.modify(|_, w| w.imr().bit(true));
     }
 
     pub fn reset_color_keying(&self) {
-
+        let ltdc = unsafe{&*LTDC.get()};
+        match self.current_layer {
+            Layer::Background => {
+                ltdc.l1ckcr.modify(|_, w| unsafe {
+                    w.ckred().bits(0)
+                     .ckgreen().bits(0)
+                     .ckblue().bits(0)
+                });
+                ltdc.l1cr.modify(|_, w| w.colken().bit(true));
+            },
+            Layer::Foreground => {
+                ltdc.l2ckcr.modify(|_, w| unsafe {
+                    w.ckred().bits(0)
+                     .ckgreen().bits(0)
+                     .ckblue().bits(0)
+                });
+                ltdc.l2cr.modify(|_, w| w.colken().bit(true));
+            },
+        };
+        ltdc.srcr.modify(|_, w| w.imr().bit(true));
     }
 
-    fn draw_char(&self, x : u16, y : u16, c : &u16) {
-
+    fn draw_char(&self, x : u16, y : u16, c : &[u16]) {
+        let x = x * LCD_WIDTH * 2;
+        let mut x_addr = y as u32;
+        for index in 0..(self.current_font.height) {
+            for cntr in 0..(self.current_font.width) {
+                let mem_loc = (self.current_frame_buffer + (2 * x_addr) + x as u32) as *mut u16;
+                if (((c[index as usize] & ((0x80 << ((self.current_font.width / 12) * 8)) >> cntr)) == 0x00) &&
+                        self.current_font.width <= 12) ||
+                        (((c[index as usize] & 0x01 << cntr)) == 0x00) &&
+                        self.current_font.width > 12 {
+                    unsafe {
+                        *mem_loc = self.current_back_color as u16;
+                    }
+                } else {
+                    unsafe {
+                        *mem_loc = self.current_text_color as u16;
+                    }
+                }
+            }
+            x_addr += LCD_WIDTH as u32 - self.current_font.width as u32;
+        }
     }
 
     pub fn display_char(&self, line : u16, col : u16, ascii : char) {
-
+        let pos = (ascii as u8) - 32;
+        self.draw_char(
+            line,
+            col,
+            &self.current_font.table[
+                (pos as u16 * self.current_font.height) as usize ..
+                    (pos as u16 * self.current_font.height + self.current_font.height) as usize
+            ]
+        );
     }
 
     pub fn display_string_line(&self, line : u16, s : &str) {
@@ -548,6 +632,7 @@ impl Lcd {
 
     pub fn draw_rect(&self, x : u16, y : u16, w : u16, h : u16) -> Result<(), LcdError> {
 
+        Ok(())
     }
 
     pub fn draw_circle(&self, x : u16, y : u16, r : u16) -> Result<(), LcdError> {
@@ -623,22 +708,224 @@ impl Lcd {
     }
 
     fn configure_ctrl_lines() {
+        let rcc = unsafe{&*RCC.get()};
+        let pc  = unsafe{&*GPIOC.get()};
+        let pd  = unsafe{&*GPIOD.get()};
 
+        rcc.ahb1enr.modify(|_, w|
+            w.gpiocen().bit(true)
+             .gpioden().bit(true)
+        );
+
+        pc.moder.modify(|_, w| unsafe{
+            w.moder2().bits(1)
+        });
+        pd.moder.modify(|_, w| unsafe{
+            w.moder13().bits(1)
+        });
+
+        Lcd::write_ctrl_line(CtrlLine::Ncs, true);
     }
 
-    fn write_ctrl_line(p : CtrlLinePort, l : CtrlLine, state : bool) {
-
+    fn write_ctrl_line(l : CtrlLine, state : bool) {
+        let pc = unsafe{&*GPIOC.get()};
+        let pd = unsafe{&*GPIOD.get()};
+        match l {
+            CtrlLine::Ncs => pc.odr.modify(|_, w| w.odr2().bit(state)),
+            CtrlLine::Nwr => pd.odr.modify(|_, w| w.odr13().bit(state)),
+        };
     }
 
     fn configure_spi() {
+        let rcc = unsafe{&*RCC.get()};
+        let pf = unsafe{&*GPIOF.get()};
+        let spi = unsafe{&*SPI5.get()};
 
+        rcc.ahb1enr.modify(|_, w| w.gpiofen().bit(true));
+        rcc.apb2enr.modify(|_, w| w.spi5enr().bit(true));
+
+        // configure as alt fn
+        pf.moder.modify(|_, w| unsafe {
+            w.moder7().bits(2)
+             .moder8().bits(2)
+             .moder9().bits(2)
+        });
+
+        // medium high speed
+        pf.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr7().bits(2)
+             .ospeedr8().bits(2)
+             .ospeedr9().bits(2)
+        });
+
+        pf.afrl.modify(|_, w| unsafe {
+            w.afrl7().bits(5)
+        });
+        pf.afrh.modify(|_, w| unsafe {
+            w.afrh8().bits(5)
+             .afrh9().bits(5)
+        });
+
+        // do not reconfigure if already enabled
+        if spi.cr1.read().spe().bit() == false {
+            spi.cr1.modify(|_, w| unsafe {
+                w.bidimode().bit(false)     // full duplex
+                 .crcen().bit(false)        // disable crc
+                 .dff().bit(false)          // 8 bits frame len
+                 .rxonly().bit(false)       // rxonly disabled
+                 .lsbfirst().bit(false)     // msb first
+                 .br().bits(0b011)          // baudrate / 16
+                 .mstr().bit(true)          // configured as master
+                 .spe().bit(true)           // enable spi
+            });
+        }
     }
 
     fn configure_alt_fn_gpios() {
+        let pa = unsafe {&*GPIOA.get()};
+        let pb = unsafe {&*GPIOB.get()};
+        let pc = unsafe {&*GPIOC.get()};
+        let pd = unsafe {&*GPIOD.get()};
+        let pf = unsafe {&*GPIOF.get()};
+        let pg = unsafe {&*GPIOG.get()};
+
+        let rcc = unsafe{&*RCC.get()};
+
+        // GPIOA ###################################################
+        pa.moder.modify(|_, w| unsafe {
+            w.moder3().bits(0b10)
+             .moder4().bits(0b10)
+             .moder6().bits(0b10)
+             .moder11().bits(0b10)
+             .moder12().bits(0b10)
+        });
+        pa.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr3().bits(0b10)
+             .ospeedr4().bits(0b10)
+             .ospeedr6().bits(0b10)
+             .ospeedr11().bits(0b10)
+             .ospeedr12().bits(0b10)
+        });
+
+        pa.afrl.modify(|_, w| unsafe {
+            w.afrl3().bits(0x0E)
+             .afrl4().bits(0x0E)
+             .afrl6().bits(0x0E)
+        });
+        pa.afrh.modify(|_, w| unsafe {
+            w.afrh11().bits(0x0E)
+             .afrh12().bits(0x0E)
+        });
+
+        // GPIOB ###################################################
+        pb.moder.modify(|_, w| unsafe {
+            w.moder0().bits(0b10)
+             .moder1().bits(0b10)
+             .moder8().bits(0b10)
+             .moder9().bits(0b10)
+             .moder10().bits(0b10)
+             .moder11().bits(0b10)
+        });
+        pb.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr0().bits(0b10)
+             .ospeedr1().bits(0b10)
+             .ospeedr8().bits(0b10)
+             .ospeedr9().bits(0b10)
+             .ospeedr10().bits(0b10)
+             .ospeedr11().bits(0b10)
+        });
+
+        pb.afrl.modify(|_, w| unsafe {
+            w.afrl0().bits(0x09)
+             .afrl1().bits(0x09)
+        });
+        pb.afrh.modify(|_, w| unsafe {
+            w.afrh8().bits(0x0E)
+             .afrh9().bits(0x0E)
+             .afrh10().bits(0x0E)
+             .afrh11().bits(0x0E)
+        });
+
+        // GPIOC ###################################################
+        pc.moder.modify(|_, w| unsafe {
+            w.moder6().bits(0b10)
+             .moder7().bits(0b10)
+             .moder10().bits(0b10)
+        });
+        pc.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr6().bits(0b10)
+             .ospeedr7().bits(0b10)
+             .ospeedr10().bits(0b10)
+        });
+
+        pc.afrl.modify(|_, w| unsafe {
+            w.afrl6().bits(0x0E)
+             .afrl7().bits(0x0E)
+        });
+        pc.afrh.modify(|_, w| unsafe {
+            w.afrh10().bits(0x0E)
+        });
+
+        // GPIOD ###################################################
+        pd.moder.modify(|_, w| unsafe {
+            w.moder3().bits(0b10)
+             .moder6().bits(0b10)
+        });
+        pd.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr3().bits(0b10)
+             .ospeedr6().bits(0b10)
+        });
+
+        pd.afrl.modify(|_, w| unsafe {
+            w.afrl3().bits(0x0E)
+             .afrl6().bits(0x0E)
+        });
+
+        // GPIOF ###################################################
+        pf.moder.modify(|_, w| unsafe {
+            w.moder10().bits(0b10)
+        });
+        pf.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr10().bits(0b10)
+        });
+
+        pf.afrh.modify(|_, w| unsafe {
+            w.afrh10().bits(0x0E)
+        });
+
+        // GPIOG ###################################################
+        pg.moder.modify(|_, w| unsafe {
+            w.moder6().bits(0b10)
+             .moder7().bits(0b10)
+             .moder10().bits(0b10)
+             .moder11().bits(0b10)
+             .moder12().bits(0b10)
+        });
+        pg.ospeedr.modify(|_, w| unsafe {
+            w.ospeedr6().bits(0b10)
+             .ospeedr7().bits(0b10)
+             .ospeedr10().bits(0b10)
+             .ospeedr11().bits(0b10)
+             .ospeedr12().bits(0b10)
+        });
+
+        pg.afrl.modify(|_, w| unsafe {
+            w.afrl6().bits(0x0E)
+             .afrl7().bits(0x0E)
+        });
+        pg.afrh.modify(|_, w| unsafe {
+            w.afrh10().bits(0x09)
+             .afrh11().bits(0x0E)
+             .afrh12().bits(0x09)
+        });
 
     }
 
-    fn put_pixel(x : u16, y : u16) -> Result<(), LcdError> {
-
+    fn put_pixel(&self, x : u16, y : u16) -> Result<(), LcdError> {
+        if x > 239 || y > 319 {
+            return Err(LcdError::OutOfScreen);
+        }
+        self.draw_line(x, y, 1, Direction::Horizontal);
+        Ok(())
     }
 }

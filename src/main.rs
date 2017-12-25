@@ -10,6 +10,9 @@ extern crate cortex_m_semihosting;
 #[macro_use(interrupt)]
 extern crate stm32f429;
 
+#[macro_use]
+extern crate bitflags;
+
 extern crate volatile;
 
 use core::fmt::Write;
@@ -21,50 +24,28 @@ use cortex_m_semihosting::hio;
 mod bsp;
 mod misc;
 mod system;
+mod spl_rs;
 
 use system::clks;
 use bsp::l3gd20::*;
 use bsp::led::*;
 use bsp::sdram;
 use misc::*;
+use bsp::lcd::{lcd, fonts};
+use spl_rs::gpio;
 
-pub fn array_cmp(a : &[u32], b : &[u32]) -> bool {
-    for (i, elem) in a.iter().enumerate() {
-        if *elem != b[i] {
-            return false;
-        }
-    }
-    true
-}
+use stm32f429::GPIOG;
 
 fn main() {
     clks::init();
-    sdram::init();
 
-    let mut stdout = hio::hstdout().unwrap();
-
-    //let mut stdout = hio::hstdout().unwrap();
-    let addr = 0xFFFFFFF;
-    let a = [32, 345, 134512, 234, 2365, 652234];
-    let mut b : [u32; 6] = [0; 6];
+    let pg = unsafe {&*GPIOG.get()};
+    gpio::port_others::configure(pg, 13, gpio::Mode::Output, gpio::OutType::PushPull, gpio::OutSpeed::Low, gpio::PullType::NoPull);
 
     loop {
-        match sdram::write_buffer(&a, addr) {
-            Ok(_) => (),
-            Err(e) => writeln!(stdout, "{}", e).unwrap(),
-        };
-        match sdram::read_buffer(&mut b, addr) {
-            Ok(_) => (),
-            Err(e) => writeln!(stdout, "{}", e).unwrap(),
-        };
-        if array_cmp(&a, &b) {
-            writeln!(stdout, "Written array is equal to read array.");
-        } else {
-            writeln!(stdout, "Written array is different of read array.");
-        }
-        for i in b.iter_mut() {
-            *i = 0;
-        }
+        gpio::port_others::write(pg, 13, true);
+        delay(0xFFFF);
+        gpio::port_others::write(pg, 13, false);
         delay(0xFFFF);
     }
 }
