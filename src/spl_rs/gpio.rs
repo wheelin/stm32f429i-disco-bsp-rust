@@ -31,22 +31,22 @@ pub enum PullType {
 }
 
 pub enum AltFn {
-    Sys                      = 0,
-    Tim_1_2                  = 1,
-    Tim_3_4_5                = 2,
-    Tim_8_9_10               = 3,
-    I2c_1_2_3                = 4,
-    Spi_1_2_3_4_5_6          = 5,
-    Spi_2_3_Sai_1            = 6,
-    Spi_3_Usart_1_2_3        = 7,
-    Usart_6_Uart_4_5_7_8     = 8,
-    Can_1_2_Tim_12_13_14_Lcd = 9,
-    Otg_2_Hs_Otg_1_Fs        = 10,
-    Eth                      = 11,
-    Fmc_Sdio_Otg_2_Fs        = 12,
-    Dcmi                     = 13,
-    Lcd                      = 14,
-    SysEvent                 = 15,
+    Sys               = 0,
+    Tim12             = 1,
+    Tim345            = 2,
+    Tim8910           = 3,
+    I2c123            = 4,
+    Spi123456         = 5,
+    Spi23Sai1         = 6,
+    Spi3Usart123      = 7,
+    Usart6Uart4578    = 8,
+    Can12Tim121314Lcd = 9,
+    Otg2HsOtg1Fs      = 10,
+    Eth               = 11,
+    FmcSdioOtg2Fs     = 12,
+    Dcmi              = 13,
+    Lcd               = 14,
+    SysEvent          = 15,
 }
 
 pub trait IsPortA : Deref<Target = gpioa::RegisterBlock> {

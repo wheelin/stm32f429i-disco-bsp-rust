@@ -2,3 +2,5 @@
 .gdb_history
 Cargo.lock
 target/
+.idea/
+stm32f429i_disco.iml

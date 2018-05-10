@@ -1,36 +1,34 @@
 use stm32f429::{RCC, PWR, FLASH};
 
+use spl_rs::rcc;
+
 /*
 This configuration follows the one present in system_stm32f4xx.c for
 the stm32f429i-disco board template project in sw4stm32 using SPL.
 */
 
-pub fn init() {
-    let rcc = unsafe{ &*RCC.get() };
+pub fn init() -> Result<(), ()>{
     let pwr = unsafe{ &*PWR.get() };
     let flash = unsafe{ &*FLASH.get() };
 
-    rcc.cr.modify(|_, w| w.hseon().bit(true));
-    while rcc.cr.read().hserdy().bit() == false {}
+    rcc::clock_ctrl(rcc::Clock::HSE_ON, true);
+    while rcc::check_flag(rcc::ClkFlag::HSE_RDY) != true {}
 
-    rcc.pllcfgr.modify(|_, w| unsafe {
-        w.pllq().bits(0b0111)
-         .pllm().bits(0b001111)
-         .plln().bits(0b101101000)
-         .pllp().bits(0b11)
-         .pllsrc().bit(true)
-    });
+    match rcc::configure_pll(0b0111, 0b101101000, 0b11, 0b001111) {
+        Ok(()) => (),
+        Err(()) => return Err(()),
+    };
 
-    rcc.apb1enr.modify(|_, w| w.pwren().bit(true));
+    rcc::set_apb1_periph_clk(rcc::Apb1Enable::PWR, true);
 
     pwr.cr.modify(|_, w| unsafe{w.vos().bits(0b11)});
 
-    rcc.cfgr.modify(|_, w| unsafe{w.hpre().bits(0b0000)});
-    rcc.cfgr.modify(|_, w| unsafe{w.ppre2().bits(0b100)});
-    rcc.cfgr.modify(|_, w| unsafe{w.ppre1().bits(0b101)});
+    rcc::set_ahb_pre(rcc::AhbPre::Div1);
+    rcc::set_apb2_pre(rcc::ApbPre::Div2);
+    rcc::set_apb1_pre(rcc::ApbPre::Div4);
 
-    rcc.cr.modify(|_, w| w.pllon().bit(true));
-    while rcc.cr.read().pllrdy().bit() == false {}
+    rcc::clock_ctrl(rcc::Clock::PLL_ON, true);
+    while rcc::check_flag(rcc::ClkFlag::PLL_RDY) != true {}
 
     pwr.cr.modify(|_, w| w.oden().bit(true));
     while pwr.csr.read().odrdy().bit() == false {}
@@ -44,8 +42,8 @@ pub fn init() {
          .latency().bits(5)
     });
 
-    rcc.cfgr.modify(|_, w| unsafe {
-        w.sw().bits(0b10)
-    });
-    while rcc.cfgr.read().sws().bits() != 0b10 {}
+    rcc::set_sysclk_src(rcc::SysClkSrc::Pll);
+    while rcc::get_sysclk_src() != rcc::SysClkSrc::Pll {}
+
+    return Ok(())
 }

@@ -7,6 +7,7 @@ use stm32f429::{
     LTDC,
 };
 use sdram;
+use super::ltdc;
 
 pub enum LcdError {
     OutOfFrame,
@@ -75,6 +76,7 @@ pub enum Direction {
     Vertical   = 0x0001,
 }
 
+#[derive(PartialEq)]
 pub enum Layer {
     Background = 0x0000,
     Foreground = 0x0001,
@@ -587,7 +589,7 @@ impl Lcd {
                 let mem_loc = (self.current_frame_buffer + (2 * x_addr) + x as u32) as *mut u16;
                 if (((c[index as usize] & ((0x80 << ((self.current_font.width / 12) * 8)) >> cntr)) == 0x00) &&
                         self.current_font.width <= 12) ||
-                        (((c[index as usize] & 0x01 << cntr)) == 0x00) &&
+                        ((c[index as usize] & 0x01 << cntr) == 0x00) &&
                         self.current_font.width > 12 {
                     unsafe {
                         *mem_loc = self.current_back_color as u16;
@@ -615,10 +617,38 @@ impl Lcd {
     }
 
     pub fn display_string_line(&self, line : u16, s : &str) {
+        let mut ref_col : u16 = 0;
+        let mut char_cntr = 0;
 
+        while ref_col < LCD_WIDTH &&
+            ((self.current_font.width + ref_col) & 0xFFFF >= self.current_font.width) &&
+            (char_cntr < s.len()){
+
+            self.display_char(line, ref_col, s.chars().nth(char_cntr).unwrap());
+            ref_col += self.current_font.width;
+            char_cntr += 1;
+        }
     }
 
     pub fn set_display_window(&self, x : u16, y : u16, w : u16, h : u16) -> Result<(), LcdError> {
+        if self.current_layer == Layer::Background {
+            // layer 1 config
+
+            // set layer position
+            ltdc::set_layer_position(ltdc::Layer::First, x, y);
+
+            // reload config
+
+            // set layer size
+
+            // reload config
+
+        } else {
+            // layer 2 config
+
+        }
+
+
         Ok(())
     }
 

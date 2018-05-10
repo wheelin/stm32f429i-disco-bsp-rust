@@ -33,19 +33,36 @@ use bsp::sdram;
 use misc::*;
 use bsp::lcd::{lcd, fonts};
 use spl_rs::gpio;
+use spl_rs::rcc;
 
 use stm32f429::GPIOG;
 
 fn main() {
-    clks::init();
+    match clks::init() {
+        Ok(()) => (),
+        Err(()) => asm::bkpt(),
+    };
+
+    rcc::set_ahb1_periph_clk(rcc::Ahb1Enable::GPIOG, true);
 
     let pg = unsafe {&*GPIOG.get()};
-    gpio::port_others::configure(pg, 13, gpio::Mode::Output, gpio::OutType::PushPull, gpio::OutSpeed::Low, gpio::PullType::NoPull);
+    gpio::port_others::configure(
+        pg,
+        13,
+        gpio::Mode::Output,
+        gpio::OutType::PushPull,
+        gpio::OutSpeed::Low,
+        gpio::PullType::NoPull
+    ).unwrap();
+
+    L3GD20::get_instance().init().unwrap();
 
     loop {
-        gpio::port_others::write(pg, 13, true);
-        delay(0xFFFF);
-        gpio::port_others::write(pg, 13, false);
+        if L3GD20::get_instance().check_connection().is_ok() {
+            gpio::port_others::write(pg, 13, true).unwrap();
+            delay(0xFFFF);
+        }
+        gpio::port_others::write(pg, 13, false).unwrap();
         delay(0xFFFF);
     }
 }
