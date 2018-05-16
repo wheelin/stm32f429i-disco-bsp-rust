@@ -12,8 +12,10 @@ extern crate stm32f429;
 
 #[macro_use]
 extern crate bitflags;
-
+extern crate bare_metal;
 extern crate volatile;
+
+extern crate panic_abort;
 
 use core::fmt::Write;
 
@@ -45,7 +47,7 @@ fn main() {
 
     rcc::set_ahb1_periph_clk(rcc::Ahb1Enable::GPIOG, true);
 
-    let pg = unsafe {&*GPIOG.get()};
+    let pg = unsafe {&*GPIOG::ptr()};
     gpio::port_others::configure(
         pg,
         13,

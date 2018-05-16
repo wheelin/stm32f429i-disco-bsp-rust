@@ -17,8 +17,8 @@ impl Led {
     }
 
     pub fn init(&self) {
-        let rcc = unsafe {&*RCC.get()};
-        let pg  = unsafe {&*GPIOG.get()};
+        let rcc = unsafe {&*RCC::ptr()};
+        let pg  = unsafe {&*GPIOG::ptr()};
 
         rcc.ahb1enr.modify(|_, w| w.gpiogen().bit(true));
 
@@ -37,7 +37,7 @@ impl Led {
     }
 
     pub fn on(&self) {
-        let pg = unsafe {&*GPIOG.get()};
+        let pg = unsafe {&*GPIOG::ptr()};
 
         match self.n {
             LedName::Led3 => pg.bsrr.write(|w| w.bs13().bit(true)),
@@ -46,7 +46,7 @@ impl Led {
     }
 
     pub fn off(&self) {
-        let pg = unsafe {&*GPIOG.get()};
+        let pg = unsafe {&*GPIOG::ptr()};
 
         match self.n {
             LedName::Led3 => pg.bsrr.write(|w| w.br13().bit(true)),
@@ -55,7 +55,7 @@ impl Led {
     }
 
     pub fn toggle(&self) {
-        let pg = unsafe {&*GPIOG.get()};
+        let pg = unsafe {&*GPIOG::ptr()};
 
         match self.n {
             LedName::Led3 => {

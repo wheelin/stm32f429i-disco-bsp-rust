@@ -73,6 +73,7 @@ impl IsPortK for GPIOI {}
 impl IsPortK for GPIOJ {}
 impl IsPortK for GPIOK {}
 
+
 /////////////////////////////////////////////////////////////////////////////////
 // GPIOA Implementation
 /////////////////////////////////////////////////////////////////////////////////
@@ -269,7 +270,7 @@ pub mod gpio_b {
 /////////////////////////////////////////////////////////////////////////////////
 pub mod port_others {
     use spl_rs::gpio::*;
-    pub fn configure<T : IsPortK>(gpio_port : &T,
+    pub fn configure(gpio_port : &gpiok::RegisterBlock,
         pin : u8,
         m : Mode,
         ot : OutType,
@@ -316,7 +317,7 @@ pub mod port_others {
         Ok(())
     }
 
-    pub fn set_alt_fn<T : IsPortK>(gpio_port : &T, pin : u8, af : AltFn) -> Result<(), ()> {
+    pub fn set_alt_fn(gpio_port : &gpiok::RegisterBlock, pin : u8, af : AltFn) -> Result<(), ()> {
         if pin > 15 {return Err(());}
         let port = gpio_port;
         if pin > 7 {
@@ -339,13 +340,13 @@ pub mod port_others {
         Ok(())
     }
 
-    pub fn read<T : IsPortK>(gpio_port : &T, pin : u8) -> Result<bool, ()> {
+    pub fn read(gpio_port : &gpiok::RegisterBlock, pin : u8) -> Result<bool, ()> {
         if pin > 15 {return Err(());}
         let port = gpio_port;
         Ok((port.idr.read().bits() | (1 << pin)) != 0)
     }
 
-    pub fn write<T : IsPortK>(gpio_port : &T, pin : u8, state : bool) -> Result<(), ()> {
+    pub fn write(gpio_port : &gpiok::RegisterBlock, pin : u8, state : bool) -> Result<(), ()> {
         if pin > 15 {return Err(());}
         let port = gpio_port;
         port.bsrr.write(|w| unsafe {

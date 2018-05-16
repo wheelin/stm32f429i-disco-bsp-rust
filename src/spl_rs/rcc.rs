@@ -11,7 +11,7 @@ bitflags! {
 }
 
 pub fn check_flag(f : ClkFlag) -> bool {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     ((rcc.cr.read().bits() & f.bits()) != 0)
 }
 
@@ -28,7 +28,7 @@ bitflags! {
 }
 
 pub fn clock_ctrl(c : Clock, state : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if state {
@@ -41,7 +41,7 @@ pub fn clock_ctrl(c : Clock, state : bool) {
 }
 
 pub fn select_pll_src(hse : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.pllcfgr.modify(|_, w| {
         w.pllsrc().bit(hse)
     });
@@ -64,7 +64,7 @@ pub fn configure_pll(q : u8, n : u16, p : u8, m : u8) -> Result<(), ()> {
         return Err(())
     }
 
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.pllcfgr.modify(|_, w| unsafe {
         w.pllq().bits(q)
          .pllp().bits(p)
@@ -82,7 +82,7 @@ pub enum Mco2ClockSrc {
 }
 
 pub fn set_mco2_src(clk : Mco2ClockSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.mco2().bits(clk as u8)
     });
@@ -96,7 +96,7 @@ pub enum Mco1ClockSrc {
 }
 
 pub fn set_mco1_src(clk : Mco1ClockSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.mco1().bits(clk as u8)
     });
@@ -110,14 +110,14 @@ pub enum McoPre {
 }
 
 pub fn set_mco2_pre(pre : McoPre) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.mco2pre().bits(pre as u8)
     });
 }
 
 pub fn set_mco1_pre(pre : McoPre) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.mco1pre().bits(pre as u8)
     });
@@ -129,7 +129,7 @@ pub enum I2sSrc {
 }
 
 pub fn set_plli2s_src(is : I2sSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.pllcfgr.modify(|_, w| unsafe {
         match is {
             I2sSrc::Hsi => w.pllsrc().bit(false),
@@ -143,7 +143,7 @@ pub fn set_rtc_div(d : u8) -> Result<(), ()> {
         return Err(())
     }
 
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.rtcpre().bits(d)
     });
@@ -160,14 +160,14 @@ pub enum ApbPre {
 }
 
 pub fn set_apb2_pre(ad : ApbPre) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.ppre2().bits(ad as u8)
     });
 }
 
 pub fn set_apb1_pre(ad : ApbPre) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.ppre1().bits(ad as u8)
     });
@@ -186,7 +186,7 @@ pub enum AhbPre {
 }
 
 pub fn set_ahb_pre(ap : AhbPre) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.hpre().bits(ap as u8)
     });
@@ -211,12 +211,12 @@ impl SysClkSrc {
 }
 
 pub fn get_sysclk_src() -> SysClkSrc {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     SysClkSrc::from_bits(rcc.cfgr.read().sws().bits())
 }
 
 pub fn set_sysclk_src(sw : SysClkSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cfgr.modify(|_, w| unsafe {
         w.sw().bits(sw as u8)
     });
@@ -261,7 +261,7 @@ bitflags! {
 }
 
 pub fn clear_interrupt_flag(ic : InterruptClear) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cir.modify(|r, w| unsafe {
         let o = r.bits();
         let n = o | ic.bits();
@@ -270,7 +270,7 @@ pub fn clear_interrupt_flag(ic : InterruptClear) {
 }
 
 pub fn set_interrupt(ie : InterruptEnable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.cir.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -283,7 +283,7 @@ pub fn set_interrupt(ie : InterruptEnable, en : bool) {
 }
 
 pub fn check_interrupt_flag(intf : InterruptFlag) -> bool {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     let rf = InterruptFlag::from_bits(rcc.cir.read().bits());
     let rf = if let Some(rf) = rf {
         rf
@@ -320,7 +320,7 @@ bitflags! {
 }
 
 pub fn reset_ahb1_periph(ar : Ahb1Reset, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb1rstr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -343,7 +343,7 @@ bitflags! {
 }
 
 pub fn reset_ahb2_periph(ar : Ahb2Reset, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb2rstr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -362,7 +362,7 @@ bitflags! {
 }
 
 pub fn reset_ahb3_periph(ar : Ahb3Reset, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb3rstr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -405,7 +405,7 @@ bitflags! {
 }
 
 pub fn reset_apb1_periph(ar : Apb1Reset, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb1rstr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -439,7 +439,7 @@ bitflags! {
 }
 
 pub fn reset_apb2_periph(ar : Apb2Reset, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb2rstr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -482,7 +482,7 @@ bitflags! {
 }
 
 pub fn set_ahb1_periph_clk(ae : Ahb1Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb1enr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -505,7 +505,7 @@ bitflags! {
 }
 
 pub fn set_ahb2_periph_clk(ae : Ahb2Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb2enr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -524,7 +524,7 @@ bitflags! {
 }
 
 pub fn set_ahb3_periph_clk(ae : Ahb3Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb3enr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -567,7 +567,7 @@ bitflags! {
 }
 
 pub fn set_apb1_periph_clk(ae : Apb1Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb1enr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -602,7 +602,7 @@ bitflags! {
 }
 
 pub fn set_apb2_periph_clk(ae : Apb2Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb2enr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -616,7 +616,7 @@ pub fn set_apb2_periph_clk(ae : Apb2Enable, en : bool) {
 
 ////////////////////////////////////////////////////////////////////////////////
 pub fn set_lp_ahb1_periph_clk(ae : Ahb1Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb1lpenr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -629,7 +629,7 @@ pub fn set_lp_ahb1_periph_clk(ae : Ahb1Enable, en : bool) {
 }
 
 pub fn set_lp_ahb2_periph_clk(ae : Ahb2Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb2lpenr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -642,7 +642,7 @@ pub fn set_lp_ahb2_periph_clk(ae : Ahb2Enable, en : bool) {
 }
 
 pub fn set_lp_ahb3_periph_clk(ae : Ahb3Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.ahb3lpenr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -655,7 +655,7 @@ pub fn set_lp_ahb3_periph_clk(ae : Ahb3Enable, en : bool) {
 }
 
 pub fn set_lp_apb1_periph_clk(ae : Apb1Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb1lpenr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -668,7 +668,7 @@ pub fn set_lp_apb1_periph_clk(ae : Apb1Enable, en : bool) {
 }
 
 pub fn set_lp_apb2_periph_clk(ae : Apb2Enable, en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.apb2lpenr.modify(|r, w| unsafe {
         let o = r.bits();
         let n = if en {
@@ -682,14 +682,14 @@ pub fn set_lp_apb2_periph_clk(ae : Apb2Enable, en : bool) {
 
 ////////////////////////////////////////////////////////////////////////////////
 pub fn reset_backup_domain(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.modify(|_, w| {
         w.bdrst().bit(en)
     });
 }
 
 pub fn set_rtc(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.modify(|_, w| {
         w.rtcen().bit(en)
     });
@@ -704,7 +704,7 @@ pub enum RtcClkSrc {
 }
 
 pub fn set_rtc_clk_src(rcs : RtcClkSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.modify(|_, w| {
         let sel0 = ((rcs as u8) & 1) != 0;
         let sel1 = ((rcs as u8) >> 1) & 1 != 0;
@@ -714,21 +714,21 @@ pub fn set_rtc_clk_src(rcs : RtcClkSrc) {
 }
 
 pub fn enable_lse_bypass(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.modify(|_, w| {
         w.lsebyp().bit(en)
     });
 }
 
 pub fn set_lse(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.modify(|_, w| {
         w.lseon().bit(en)
     });
 }
 
 pub fn get_lse_status() -> bool {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.bdcr.read().lserdy().bit()
 }
 
@@ -746,7 +746,7 @@ bitflags! {
 }
 
 pub fn get_reset_flag() -> ResetFlag {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     let ret = ResetFlag::from_bits(rcc.csr.read().bits() & 0xFF000000);
     if let Some(ret) = ret {
         ret
@@ -756,17 +756,17 @@ pub fn get_reset_flag() -> ResetFlag {
 }
 
 pub fn clear_reset_flag() {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.csr.modify(|_, w| w.rmvf().bit(true));
 }
 
 pub fn check_lsi_flag() -> bool {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.csr.read().lsirdy().bit()
 }
 
 pub fn set_lsi(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.csr.modify(|r, w| {
         w.lsion().bit(en)
     });
@@ -774,14 +774,14 @@ pub fn set_lsi(en : bool) {
 
 ////////////////////////////////////////////////////////////////////////////////
 pub fn set_sspm(en : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.sscgr.modify(|_, w| {
         w.sscgen().bit(en)
     });
 }
 
 pub fn select_spread(down : bool) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.sscgr.modify(|_, w| {
         w.spreadsel().bit(down)
     });
@@ -791,7 +791,7 @@ pub fn set_sscg_inc_step(is : u16) -> Result<(), ()> {
     if is > 32767 {
         return Err(())
     }
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.sscgr.modify(|_, w| unsafe {
         w.incstep().bits(is)
     });
@@ -803,7 +803,7 @@ pub fn set_sscg_mod_period(mp : u16) -> Result<(), ()>{
     if mp > 4095 {
         return Err(())
     }
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.sscgr.modify(|_, w| unsafe {
         w.modper().bits(mp)
     });
@@ -836,7 +836,7 @@ pub fn conf_i2s_pll(r : u8, q : u8, n : u16) -> Result<(), ()> {
         _ => (),
     };
 
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.plli2scfgr.modify(|_, w| unsafe {
         w.plli2sr().bits(r)
          .plli2sn().bits(n)
@@ -866,7 +866,7 @@ pub fn conf_sai_pll(r : u8, q : u8, n : u16) -> Result<(), ()> {
         _ => (),
     };
 
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.pllsaicfgr.modify(|_, w| unsafe {
         w.pllsair().bits(r)
          .pllsain().bits(n)
@@ -883,7 +883,7 @@ pub enum TimMul {
 }
 
 pub fn set_timers_freq(m : TimMul) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| {
         match m {
             TimMul::Time2 => w.timpre().bit(false),
@@ -899,7 +899,7 @@ pub enum Sai1BClkSrc {
 }
 
 pub fn set_sai1b_clk_src(sbcs : Sai1BClkSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| unsafe {
         w.sai1bsrc().bits(sbcs as u8)
     });
@@ -912,7 +912,7 @@ pub enum Sai1AClkSrc {
 }
 
 pub fn set_sai1a_clk_src(sacs : Sai1AClkSrc) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| unsafe {
         w.sai1asrc().bits(sacs as u8)
     });
@@ -926,7 +926,7 @@ pub enum LcdPllSaiDiv {
 }
 
 pub fn conf_lcd_pllsai_divr(d : LcdPllSaiDiv) {
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| unsafe {
         w.pllsaidivr().bits(d as u8)
     });
@@ -937,7 +937,7 @@ pub fn conf_sai1_pllsai_divq(d : u8) -> Result<(), ()>{
         return Err(())
     }
     let d = d - 1;
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| unsafe {
         w.pllsaidivq().bits(d)
     });
@@ -949,7 +949,7 @@ pub fn conf_i2s_pllsai_divq(d : u8) -> Result<(), ()> {
         return Err(())
     }
     let d = d - 1;
-    let rcc = unsafe {&*RCC.get()};
+    let rcc = unsafe {&*RCC::ptr()};
     rcc.dckcfgr.modify(|_, w| unsafe {
         w.pllis2divq().bits(d)
     });

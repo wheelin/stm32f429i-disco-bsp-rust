@@ -31,13 +31,13 @@ impl fmt::Display for SdRamError {
 }
 
 pub fn init_gpios() {
-    let rcc = unsafe{&*RCC.get()};
-    let pb = unsafe{&*GPIOB.get()};
-    let pc = unsafe{&*GPIOC.get()};
-    let pd = unsafe{&*GPIOD.get()};
-    let pe = unsafe{&*GPIOE.get()};
-    let pf = unsafe{&*GPIOF.get()};
-    let pg = unsafe{&*GPIOG.get()};
+    let rcc = unsafe{&*RCC::ptr()};
+    let pb = unsafe{&*GPIOB::ptr()};
+    let pc = unsafe{&*GPIOC::ptr()};
+    let pd = unsafe{&*GPIOD::ptr()};
+    let pe = unsafe{&*GPIOE::ptr()};
+    let pf = unsafe{&*GPIOF::ptr()};
+    let pg = unsafe{&*GPIOG::ptr()};
 
     rcc.ahb1enr.modify(|_, w|{
         w.gpioben().bit(true)
@@ -283,7 +283,7 @@ pub fn init_gpios() {
          .moder8().bits(GPIO_ALT_FN)
          .moder15().bits(GPIO_ALT_FN)
     });
-    pg.otyper.modify(|_, w| 
+    pg.otyper.modify(|_, w|
         w.ot0().bit(false)
          .ot1().bit(false)
          .ot4().bit(false)
@@ -322,8 +322,8 @@ pub fn init_gpios() {
 pub fn init() {
     init_gpios();
 
-    let fmc = unsafe{&*FMC.get()};
-    let rcc = unsafe{&*RCC.get()};
+    let fmc = unsafe{&*FMC::ptr()};
+    let rcc = unsafe{&*RCC::ptr()};
 
     rcc.ahb3enr.write(|w| w.fmcen().bit(true));
 
@@ -360,7 +360,7 @@ pub fn init() {
 }
 
 pub fn init_sequence() {
-    let fmc = unsafe{&*FMC.get()};
+    let fmc = unsafe{&*FMC::ptr()};
 
     while fmc.sdsr.read().busy().bit() == true {}
     // configure clock conf enable command
@@ -442,7 +442,7 @@ pub fn write_buffer(buf : &[u32], addr : u32) -> Result<(), SdRamError> {
         return Err(SdRamError::UnalignedAccess(next_available_address));
     }
 
-    let fmc = unsafe{&*FMC.get()};
+    let fmc = unsafe{&*FMC::ptr()};
     while fmc.sdsr.read().busy().bit() == true {}
 
     // sd ram refresh error
@@ -473,7 +473,7 @@ pub fn read_buffer(buf : &mut [u32], addr : u32) -> Result<(), SdRamError> {
         return Err(SdRamError::UnalignedAccess(next_available_address));
     }
 
-    let fmc = unsafe{&*FMC.get()};
+    let fmc = unsafe{&*FMC::ptr()};
     while fmc.sdsr.read().busy().bit() == true {}
 
     let mut mem_ptr = SDRAM_BANK_ADDR + addr;

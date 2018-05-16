@@ -8,8 +8,8 @@ the stm32f429i-disco board template project in sw4stm32 using SPL.
 */
 
 pub fn init() -> Result<(), ()>{
-    let pwr = unsafe{ &*PWR.get() };
-    let flash = unsafe{ &*FLASH.get() };
+    let pwr = unsafe{ &*PWR::ptr() };
+    let flash = unsafe{ &*FLASH::ptr() };
 
     rcc::clock_ctrl(rcc::Clock::HSE_ON, true);
     while rcc::check_flag(rcc::ClkFlag::HSE_RDY) != true {}

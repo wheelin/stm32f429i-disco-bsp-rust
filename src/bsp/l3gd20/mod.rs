@@ -1,7 +1,7 @@
 use stm32f429;
 use stm32f429::interrupt;
 use cortex_m::peripheral::NVIC;
-
+use bare_metal::Nr;
 use spl_rs::{gpio, rcc};
 
 pub enum L3GD20Error {
@@ -73,7 +73,7 @@ impl L3GD20 {
         rcc::set_apb2_periph_clk(rcc::Apb2Enable::SPI5, true);
 
         // configure cs pin, output pull-up, default high state
-        let pc = unsafe{&*stm32f429::GPIOC.get()};
+        let pc = unsafe{&*stm32f429::GPIOC::ptr()};
         gpio::port_others::configure(
             pc,
             1,
@@ -85,7 +85,7 @@ impl L3GD20 {
 
         // configure spi pins
         // set as alternative function pin
-        let pf = unsafe{ &*stm32f429::GPIOF.get() };
+        let pf = unsafe{ &*stm32f429::GPIOF::ptr() };
         let pfpins = [7, 8, 9];
         for i in pfpins.iter() {
             gpio::port_others::configure(
@@ -104,7 +104,7 @@ impl L3GD20 {
         }
 
         // configure spi5 for sensor interface
-        let spi = unsafe{&*stm32f429::SPI5.get()};
+        let spi = unsafe{&*stm32f429::SPI5::ptr()};
         spi.cr1.modify(|_, w| unsafe {
             w.bidimode().bit(false)
              .crcen().bit(false)
@@ -119,13 +119,14 @@ impl L3GD20 {
 
         // configure interrupts when pins changing
         // exti conf
-        let sc = unsafe{&*stm32f429::SYSCFG.get()};
+        let sc = unsafe{&*stm32f429::SYSCFG::ptr()};
         sc.exticr1.modify(|_, w| unsafe{
             w.exti1().bits(0b0000)
         });
 
-        let nvic = unsafe{&*NVIC.get()};
-        nvic.enable(interrupt::Interrupt::EXTI1);
+        let nvic = unsafe{&*NVIC::ptr()};
+        let nr = interrupt::Interrupt::EXTI1.nr();
+        unsafe { nvic.iser[usize::from(nr / 32)].write(1 << (nr % 32)) };
 
         spi.cr1.modify(|_, w| w.spe().bit(true));
 
@@ -135,10 +136,10 @@ impl L3GD20 {
     pub fn write_reg(&self, reg : Register, dat : u8) {
         let reg = 0x3F & reg as u8;
 
-        let pc = unsafe{&*stm32f429::GPIOC.get()};
+        let pc = unsafe{&*stm32f429::GPIOC::ptr()};
         gpio::port_others::write(pc, 1, true).unwrap();
 
-        let spi = unsafe{&*stm32f429::SPI5.get()};
+        let spi = unsafe{&*stm32f429::SPI5::ptr()};
 
         spi.dr.write(|w| unsafe{w.bits(reg as u32)});
         while spi.sr.read().txe().bit() == false {}
@@ -152,8 +153,8 @@ impl L3GD20 {
     pub fn read_reg(&self, reg : Register) -> u8 {
         let reg = (0x80 | reg as u8) & 0b1011_1111;
 
-        let pc = unsafe{&*stm32f429::GPIOC.get()};
-        let spi = unsafe{&*stm32f429::SPI5.get()};
+        let pc = unsafe{&*stm32f429::GPIOC::ptr()};
+        let spi = unsafe{&*stm32f429::SPI5::ptr()};
 
         gpio::port_others::write(pc, 1, true).unwrap();
 

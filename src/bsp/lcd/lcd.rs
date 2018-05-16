@@ -111,15 +111,15 @@ impl Lcd {
     }
 
     pub fn deinit(&mut self) {
-        let spi = unsafe {&*SPI5.get()};
-        let rcc = unsafe {&*RCC.get()};
+        let spi = unsafe {&*SPI5::ptr()};
+        let rcc = unsafe {&*RCC::ptr()};
 
-        let pa = unsafe {&*GPIOA.get()};
-        let pb = unsafe {&*GPIOB.get()};
-        let pc = unsafe {&*GPIOC.get()};
-        let pd = unsafe {&*GPIOD.get()};
-        let pf = unsafe {&*GPIOF.get()};
-        let pg = unsafe {&*GPIOG.get()};
+        let pa = unsafe {&*GPIOA::ptr()};
+        let pb = unsafe {&*GPIOB::ptr()};
+        let pc = unsafe {&*GPIOC::ptr()};
+        let pd = unsafe {&*GPIOD::ptr()};
+        let pf = unsafe {&*GPIOF::ptr()};
+        let pg = unsafe {&*GPIOG::ptr()};
 
         self.display_off();
 
@@ -273,8 +273,8 @@ impl Lcd {
     }
 
     pub fn init(&mut self) {
-        let rcc = unsafe {&*RCC.get()};
-        let ltdc = unsafe {&*LTDC.get()};
+        let rcc = unsafe {&*RCC::ptr()};
+        let ltdc = unsafe {&*LTDC::ptr()};
 
         Lcd::configure_ctrl_lines();
 
@@ -338,7 +338,7 @@ impl Lcd {
     }
 
     pub fn init_layers(&mut self) {
-        let ltdc = unsafe {&*LTDC.get()};
+        let ltdc = unsafe {&*LTDC::ptr()};
         ////////////////////////////////////////////////////////////////
         // first layer configuration
         ltdc.l1whpcr.modify(|_, w| unsafe {
@@ -455,7 +455,7 @@ impl Lcd {
     }
 
     fn chip_select(&self, en : bool) {
-        let pc = unsafe{&*GPIOC.get()};
+        let pc = unsafe{&*GPIOC::ptr()};
         if en {
             pc.bsrr.write(|w| w.bs2().bit(true));
         } else {
@@ -493,7 +493,7 @@ impl Lcd {
     }
 
     pub fn set_transparency(&self, tr : u8) {
-        let ltdc = unsafe {&*LTDC.get()};
+        let ltdc = unsafe {&*LTDC::ptr()};
         match self.current_layer {
             Layer::Background => {
                 ltdc.l1cacr.modify(|_, w| unsafe{
@@ -536,7 +536,7 @@ impl Lcd {
     }
 
     pub fn set_color_keying(&self, rgb_val : u32) {
-        let ltdc = unsafe{&*LTDC.get()};
+        let ltdc = unsafe{&*LTDC::ptr()};
         match self.current_layer {
             Layer::Background => {
                 ltdc.l1ckcr.modify(|_, w| unsafe {
@@ -559,7 +559,7 @@ impl Lcd {
     }
 
     pub fn reset_color_keying(&self) {
-        let ltdc = unsafe{&*LTDC.get()};
+        let ltdc = unsafe{&*LTDC::ptr()};
         match self.current_layer {
             Layer::Background => {
                 ltdc.l1ckcr.modify(|_, w| unsafe {
@@ -738,9 +738,9 @@ impl Lcd {
     }
 
     fn configure_ctrl_lines() {
-        let rcc = unsafe{&*RCC.get()};
-        let pc  = unsafe{&*GPIOC.get()};
-        let pd  = unsafe{&*GPIOD.get()};
+        let rcc = unsafe{&*RCC::ptr()};
+        let pc  = unsafe{&*GPIOC::ptr()};
+        let pd  = unsafe{&*GPIOD::ptr()};
 
         rcc.ahb1enr.modify(|_, w|
             w.gpiocen().bit(true)
@@ -758,8 +758,8 @@ impl Lcd {
     }
 
     fn write_ctrl_line(l : CtrlLine, state : bool) {
-        let pc = unsafe{&*GPIOC.get()};
-        let pd = unsafe{&*GPIOD.get()};
+        let pc = unsafe{&*GPIOC::ptr()};
+        let pd = unsafe{&*GPIOD::ptr()};
         match l {
             CtrlLine::Ncs => pc.odr.modify(|_, w| w.odr2().bit(state)),
             CtrlLine::Nwr => pd.odr.modify(|_, w| w.odr13().bit(state)),
@@ -767,9 +767,9 @@ impl Lcd {
     }
 
     fn configure_spi() {
-        let rcc = unsafe{&*RCC.get()};
-        let pf = unsafe{&*GPIOF.get()};
-        let spi = unsafe{&*SPI5.get()};
+        let rcc = unsafe{&*RCC::ptr()};
+        let pf = unsafe{&*GPIOF::ptr()};
+        let spi = unsafe{&*SPI5::ptr()};
 
         rcc.ahb1enr.modify(|_, w| w.gpiofen().bit(true));
         rcc.apb2enr.modify(|_, w| w.spi5enr().bit(true));
@@ -812,14 +812,14 @@ impl Lcd {
     }
 
     fn configure_alt_fn_gpios() {
-        let pa = unsafe {&*GPIOA.get()};
-        let pb = unsafe {&*GPIOB.get()};
-        let pc = unsafe {&*GPIOC.get()};
-        let pd = unsafe {&*GPIOD.get()};
-        let pf = unsafe {&*GPIOF.get()};
-        let pg = unsafe {&*GPIOG.get()};
+        let pa = unsafe {&*GPIOA::ptr()};
+        let pb = unsafe {&*GPIOB::ptr()};
+        let pc = unsafe {&*GPIOC::ptr()};
+        let pd = unsafe {&*GPIOD::ptr()};
+        let pf = unsafe {&*GPIOF::ptr()};
+        let pg = unsafe {&*GPIOG::ptr()};
 
-        let rcc = unsafe{&*RCC.get()};
+        let rcc = unsafe{&*RCC::ptr()};
 
         // GPIOA ###################################################
         pa.moder.modify(|_, w| unsafe {

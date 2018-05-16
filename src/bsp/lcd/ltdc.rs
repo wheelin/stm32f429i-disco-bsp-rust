@@ -8,7 +8,7 @@ pub enum Layer {
 }
 
 pub fn set_layer_position(l : Layer, xpos : u16, ypos : u16) {
-    let ltdc = unsafe{&*LTDC.get()};
+    let ltdc = unsafe{&*LTDC::ptr()};
 
     unsafe {
         match l {
